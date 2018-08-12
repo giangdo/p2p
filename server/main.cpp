@@ -13,6 +13,7 @@ using Json = nlohmann::json;
 uv_loop_t *loop;
 struct sockaddr_in addr;
 
+
 typedef struct {
     uv_write_t req;
     uv_buf_t buf;
@@ -46,7 +47,18 @@ void echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
         int day = j["day"].get<int>();
         int hour = j["hour"].get<int>();
         std::cout << cmd << day << hour << std::endl;
-        req->buf = uv_buf_init(buf->base, nread);
+        Json jSend;
+        jSend.push_back("foo0");
+        jSend.push_back("foo1");
+        jSend.push_back("foo2");
+        std::string strSend = jSend.dump(2);
+
+        int len = strlen(strSend.c_str()) + 1;
+        char* bufSend = (char*)malloc(len);
+        memset(bufSend, 0, len);
+        strncpy(bufSend, strSend.c_str(), len);
+
+        req->buf = uv_buf_init(bufSend, len);
         uv_write((uv_write_t*) req, client, &req->buf, 1, echo_write);
         return;
     }
