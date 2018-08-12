@@ -9,9 +9,11 @@
 #include<arpa/inet.h> //inet_addr
 #include<netdb.h> //hostent
 #include<getopt.h>
+#include "json.hpp"
 #include "main.h"
 
 using namespace std;
+using Json = nlohmann::json;
 
 Arg::Arg(int argc, char** argv) {
     if (argc < 7) {
@@ -213,7 +215,14 @@ int main(int argc , char *argv[])
     cl.conn(arg.getIp(), arg.getPort());
 
     //send some data
-    std::string msg =  arg.getCmd() + " " + std::to_string(arg.getDay()) + " " + std::to_string(arg.getHour());
+    Json j = {
+        {"cmd", arg.getCmd()},
+        {"day", arg.getDay()},
+        {"hour", arg.getHour()},
+    };
+
+    std::string msg = j.dump(4);
+
     cout << msg << std::endl;
     cl.sendData(msg);
 
