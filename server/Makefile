@@ -8,7 +8,7 @@ EXECUTABLES = \
 
 all: $(EXECUTABLES)
 
-server: utils.c main.cpp
+server: main.cpp
 	$(CC) $(CCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBUV)
 
 .PHONY: clean
