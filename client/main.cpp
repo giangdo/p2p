@@ -176,7 +176,11 @@ bool Client::conn(string address , int port)
 bool Client::sendData(string data)
 {
     //Send some data
-    if( send(m_sock , data.c_str() , strlen( data.c_str() ) , 0) < 0)
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    int len = strlen(data.c_str());
+    strncpy(buf, data.c_str(), len);
+    if( send(m_sock , buf, len + 1, 0) < 0)
     {
         perror("Send failed : ");
         return false;
@@ -221,7 +225,7 @@ int main(int argc , char *argv[])
         {"hour", arg.getHour()},
     };
 
-    std::string msg = j.dump(4);
+    std::string msg = j.dump(2);
 
     cout << msg << std::endl;
     cl.sendData(msg);
