@@ -25,6 +25,9 @@ typedef struct {
 class Db {
     public:
         void insertClient(std::string ip);
+        void update(std::string ip, bool status);
+
+        std::vector<std::string> getAllClient();
         std::vector<std::string> getAliveClient();
         std::map<std::string, std::string> getAliveClientFrom(int hours);
     private:
@@ -53,4 +56,17 @@ class CmdHdl
         static void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf);
         static void free_write_req(uv_write_t *req);
 };
+
+class Client
+{
+private:
+    int m_sock;
+
+public:
+    Client();
+    bool conn(std::string, int);
+    bool sendData(std::string data);
+    std::string recvData(int);
+};
+
 #endif /* MAIN_H_ */

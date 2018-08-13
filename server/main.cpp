@@ -15,21 +15,42 @@ void Db::insertClient(std::string ip) {
     cl.isAlive = true;
     cl.startLive = std::chrono::system_clock::now();
 
-    m_mu.lock();
+    std::lock_guard<std::mutex> guard(m_mu);
     m_clDb[ip] = cl;
-    m_mu.unlock();
+}
+
+void Db::update(std::string ip, bool status) {
+    std::lock_guard<std::mutex> guard(m_mu);
+
+    ClStat cl = m_clDb[ip];
+    if ((cl.isAlive == true) && (status == true)) {
+    } else {
+        cl.isAlive = status;
+        cl.startLive = std::chrono::system_clock::now();
+    }
+    m_clDb[ip] = cl;
+}
+
+std::vector<std::string> Db::getAllClient()
+{
+    std::vector<std::string> clList;
+    std::lock_guard<std::mutex> guard(m_mu);
+    for(auto const &entry : m_clDb) {
+        clList.push_back(entry.first);
+    }
+
+    return clList;
 }
 
 std::vector<std::string> Db::getAliveClient() {
     std::vector<std::string> clList;
 
-    m_mu.lock();
+    std::lock_guard<std::mutex> guard(m_mu);
     for(auto const &entry : m_clDb) {
         if (entry.second.isAlive == true) {
             clList.push_back(entry.first);
         }
     }
-    m_mu.unlock();
 
     return clList;
 }
@@ -37,7 +58,7 @@ std::vector<std::string> Db::getAliveClient() {
 std::map<std::string, std::string> Db::getAliveClientFrom(int hours) {
     std::map<std::string, std::string> clMap;
 
-    m_mu.lock();
+    std::lock_guard<std::mutex> guard(m_mu);
     for(auto const &entry : m_clDb) {
         // Get the time when this node is started alive
         std::time_t st = std::chrono::system_clock::to_time_t(entry.second.startLive);
@@ -54,7 +75,6 @@ std::map<std::string, std::string> Db::getAliveClientFrom(int hours) {
             clMap[entry.first] = nowStr;
         }
     }
-    m_mu.unlock();
 
     return clMap;
 }
@@ -193,8 +213,160 @@ void CmdHdl::run(){
     }
 }
 
+
+Client::Client()
+{
+    m_sock = -1;
+}
+
+/**
+    Connect to a host on a certain port number
+*/
+bool Client::conn(std::string address , int port)
+{
+    //create socket if it is not already created
+    if(m_sock == -1)
+    {
+        //Create socket
+        m_sock = socket(AF_INET , SOCK_STREAM , 0);
+        if (m_sock == -1)
+        {
+            perror("Could not create socket");
+        }
+
+        std::cout<<"Socket created\n";
+    }
+    else    {   /* OK , nothing */  }
+
+    //setup address structure
+    int result = inet_addr(address.c_str());
+
+    struct sockaddr_in server;
+    if (result == -1)
+    {
+        struct hostent *he;
+        struct in_addr **addr_list;
+
+        //resolve the hostname, its not an ip address
+        if ( (he = gethostbyname( address.c_str() ) ) == NULL)
+        {
+            //gethostbyname failed
+            herror("gethostbyname");
+            std::cout<<"Failed to resolve hostname\n";
+
+            return false;
+        }
+
+        //Cast the h_addr_list to in_addr , since h_addr_list also has the ip address in long format only
+        addr_list = (struct in_addr **) he->h_addr_list;
+
+        for(int i = 0; addr_list[i] != NULL; i++)
+        {
+            //strcpy(ip , inet_ntoa(*addr_list[i]) );
+            server.sin_addr = *addr_list[i];
+
+            std::cout<<address<<" resolved to "<<inet_ntoa(*addr_list[i])<<std::endl;
+
+            break;
+        }
+    }
+
+    //plain ip address
+    else
+    {
+        server.sin_addr.s_addr = inet_addr( address.c_str() );
+    }
+
+    server.sin_family = AF_INET;
+    server.sin_port = htons( port );
+
+    //Connect to remote server
+    if (connect(m_sock , (struct sockaddr *)&server , sizeof(server)) < 0)
+    {
+        perror("connect failed. Error");
+        return false;
+    }
+
+    std::cout<<"Connected\n";
+    return true;
+}
+
+/**
+    Send data to the connected host
+*/
+bool Client::sendData(std::string data)
+{
+    //Send some data
+    char buf[512];
+    memset(buf, 0, sizeof(buf));
+    int len = strlen(data.c_str());
+    strncpy(buf, data.c_str(), len);
+    if( send(m_sock , buf, len + 1, 0) < 0)
+    {
+        perror("Send failed : ");
+        return false;
+    }
+    std::cout<<"Data send\n";
+
+    return true;
+}
+
+/**
+    Receive data from the connected host
+*/
+std::string Client::recvData(int size=512)
+{
+    char buffer[size];
+    std::string reply;
+
+    //Receive a reply from the server
+    if( recv(m_sock , buffer , sizeof(buffer) , 0) < 0)
+    {
+        puts("recv failed");
+    }
+
+    reply = buffer;
+    return reply;
+}
+
+void pingFrq() {
+    while (1) {
+        std::this_thread::sleep_for(std::chrono::microseconds(1000*1000*20));
+        // Copy out the list of client first
+        std::vector<std::string> allCls = dataBase.getAllClient();
+
+        for (auto const &entry : allCls) {
+            Client cl;
+            if (!cl.conn(entry, 8080)) {
+                dataBase.update(entry, false);
+                continue;
+            }
+
+            Json jSend = {{"cmd", "ping"}};
+            std::string msg =  jSend.dump(2);
+            if (!cl.sendData(msg)) {
+                dataBase.update(entry, false);
+                continue;
+            }
+
+            std::string recvMsg = cl.recvData(1024);
+            auto j = Json::parse(recvMsg);
+            std::string rsp = j["response"].get<std::string>();
+            std::string okStr("ok");
+            if (rsp == okStr) {
+                dataBase.update(entry, true);
+            } else {
+                dataBase.update(entry, false);
+            }
+        }
+    }
+}
+
 int main() {
     std::cout << "Seeder listen command  on port 9090" << std::endl;
     CmdHdl::init();
-    CmdHdl::run();
+    std::thread t1(CmdHdl::run);
+    std::thread t2(pingFrq);
+    t1.join();
+    t2.join();
 }
