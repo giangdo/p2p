@@ -10,6 +10,27 @@
 #include<netdb.h> //hostent
 #include<getopt.h>
 #include <uv.h>
+#include <map>
+#include <ctime>
+#include <chrono>
+#include <vector>
+#include <thread>         // std::thread
+#include <mutex>          // std::mutex
+
+typedef struct {
+    bool isAlive;
+    std::chrono::system_clock::time_point startLive;
+}ClStat;
+
+class Db {
+    public:
+        void insertClient(std::string ip);
+        std::vector<std::string> getAliveClient();
+        std::vector<std::string> getAliveClientFrom(int hours);
+    private:
+        std::map<std::string, ClStat> m_clDb;
+        std::mutex m_mu;
+};
 
 class CmdHdl
 {
@@ -25,6 +46,7 @@ class CmdHdl
             uv_buf_t buf;
         } write_req_t;
 
+        static std::string getClientIP(uv_stream_t *client);
         static void on_new_connection(uv_stream_t *server, int status);
         static void echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf);
         static void echo_write(uv_write_t *req, int status);

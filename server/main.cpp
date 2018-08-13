@@ -8,6 +8,46 @@
 
 using Json = nlohmann::json;
 
+Db dataBase;
+
+void Db::insertClient(std::string ip) {
+    ClStat cl;
+    cl.isAlive = true;
+    cl.startLive = std::chrono::system_clock::now();
+
+    m_mu.lock();
+    m_clDb[ip] = cl;
+    m_mu.unlock();
+}
+
+std::vector<std::string> Db::getAliveClient() {
+    std::vector<std::string> clList;
+
+    m_mu.lock();
+    for(auto const &entry : m_clDb) {
+        if (entry.second.isAlive == true) {
+            clList.push_back(entry.first);
+        }
+    }
+    m_mu.unlock();
+
+    return clList;
+}
+
+std::vector<std::string> Db::getAliveClientFrom(int hours) {
+    std::vector<std::string> clList;
+
+    m_mu.lock();
+    for(auto const &entry : m_clDb) {
+        if (entry.second.isAlive == true) {
+            clList.push_back(entry.first);
+        }
+    }
+    m_mu.unlock();
+
+    return clList;
+}
+
 uv_loop_t* CmdHdl::m_loop = nullptr;
 uv_tcp_t CmdHdl::m_server;
 
@@ -29,6 +69,25 @@ void CmdHdl::echo_write(uv_write_t *req, int status) {
     free_write_req(req);
 }
 
+std::string CmdHdl::getClientIP(uv_stream_t *client) {
+    struct sockaddr_storage peername;
+    int namelen = sizeof(peername);
+    int rc = uv_tcp_getpeername((uv_tcp_t*)client, (struct sockaddr*)&peername, &namelen);
+    if (rc < 0) {
+        std::cout << "Can not get peer name " << uv_strerror(rc) << std::endl;
+    }
+    char hostbuf[NI_MAXHOST], portbuf[NI_MAXSERV];
+    char ipStr[INET_ADDRSTRLEN];
+    if (getnameinfo((struct sockaddr*)&peername, namelen , hostbuf, NI_MAXHOST, portbuf, NI_MAXSERV, 0) == 0) {
+        struct sockaddr_in *s = (struct sockaddr_in *)&peername;
+        inet_ntop(AF_INET, &s->sin_addr, ipStr, sizeof(ipStr));
+        std::cout << "hostname: " << hostbuf << " ip: " << ipStr << " port:" << portbuf << std::endl;
+    } else {
+        std::cout << "peer (unknonwn hostname) connected" << std::endl;
+    }
+    return std::string(ipStr);
+}
+
 void CmdHdl::echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
     if (nread > 0) {
         write_req_t *req = (write_req_t*) malloc(sizeof(write_req_t));
@@ -46,20 +105,25 @@ void CmdHdl::echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) 
         Json jSend;
         if (cmd == helloStr) {
             jSend["response"] = "ok";
+            std::string ipStr = getClientIP(client);
+            jSend["ip"] = ipStr;
+            dataBase.insertClient(ipStr);
         }
         else if (cmd == listStr) {
-            jSend.push_back("foo0");
-            jSend.push_back("foo1");
-            jSend.push_back("foo2");
+            std::vector<std::string> clList = dataBase.getAliveClient();
+            for(auto const &entry : clList) {
+                jSend.push_back(entry);
+            }
         }
         else if (cmd == queryStr) {
             int day = j["day"].get<int>();
             int hour = j["hour"].get<int>();
             std::cout << "from day: " << day << "from hour: " << hour << std::endl;
 
-            jSend.push_back("ffoo0");
-            jSend.push_back("ffoo1");
-            jSend.push_back("ffoo2");
+            std::vector<std::string> clList = dataBase.getAliveClientFrom(day * 24 + hour);
+            for(auto const &entry : clList) {
+                jSend.push_back(entry);
+            }
         }
 
         // Prepare buffer to send back
@@ -92,23 +156,6 @@ void CmdHdl::on_new_connection(uv_stream_t *server, int status) {
     uv_tcp_t *client = (uv_tcp_t*) malloc(sizeof(uv_tcp_t));
     uv_tcp_init(m_loop, client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
-        struct sockaddr_storage peername;
-        int namelen = sizeof(peername);
-        int rc = uv_tcp_getpeername(client, (struct sockaddr*)&peername, &namelen);
-        if (rc < 0) {
-            std::cout << "Can not get peer name " << uv_strerror(rc) << std::endl;
-        }
-        char hostbuf[NI_MAXHOST], portbuf[NI_MAXSERV];
-        if (getnameinfo((struct sockaddr*)&peername, namelen , hostbuf, NI_MAXHOST, portbuf, NI_MAXSERV, 0) == 0) {
-            char ipStr[INET_ADDRSTRLEN];
-            struct sockaddr_in *s = (struct sockaddr_in *)&peername;
-            inet_ntop(AF_INET, &s->sin_addr, ipStr, sizeof(ipStr));
-            std::cout << "hostname: " << hostbuf << " ip: " << ipStr << " port:" << portbuf << std::endl;
-        } else {
-            std::cout << "peer (unknonwn hostname) connected" << std::endl;
-        }
-
-
         uv_read_start((uv_stream_t*) client, alloc_buffer, echo_read);
     }
     else {
