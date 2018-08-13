@@ -34,18 +34,21 @@ std::vector<std::string> Db::getAliveClient() {
     return clList;
 }
 
-std::vector<std::string> Db::getAliveClientFrom(int hours) {
-    std::vector<std::string> clList;
+std::map<std::string, std::string> Db::getAliveClientFrom(int hours) {
+    std::map<std::string, std::string> clMap;
 
     m_mu.lock();
     for(auto const &entry : m_clDb) {
         if (entry.second.isAlive == true) {
-            clList.push_back(entry.first);
+            // TODO add more condition
+            std::time_t now = std::chrono::system_clock::to_time_t(entry.second.startLive);
+            std::string nowStr(std::ctime(&now));
+            clMap[entry.first] = nowStr;
         }
     }
     m_mu.unlock();
 
-    return clList;
+    return clMap;
 }
 
 uv_loop_t* CmdHdl::m_loop = nullptr;
@@ -118,12 +121,9 @@ void CmdHdl::echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) 
         else if (cmd == queryStr) {
             int day = j["day"].get<int>();
             int hour = j["hour"].get<int>();
-            std::cout << "from day: " << day << "from hour: " << hour << std::endl;
-
-            std::vector<std::string> clList = dataBase.getAliveClientFrom(day * 24 + hour);
-            for(auto const &entry : clList) {
-                jSend.push_back(entry);
-            }
+            std::map<std::string, std::string> clMap = dataBase.getAliveClientFrom(day * 24 + hour);
+            Json j(clMap);
+            jSend = j;
         }
 
         // Prepare buffer to send back

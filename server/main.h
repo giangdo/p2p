@@ -26,7 +26,7 @@ class Db {
     public:
         void insertClient(std::string ip);
         std::vector<std::string> getAliveClient();
-        std::vector<std::string> getAliveClientFrom(int hours);
+        std::map<std::string, std::string> getAliveClientFrom(int hours);
     private:
         std::map<std::string, ClStat> m_clDb;
         std::mutex m_mu;
