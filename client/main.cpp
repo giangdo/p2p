@@ -308,7 +308,7 @@ void PingHdl::init() {
     uv_tcp_init(m_loop, &m_server);
 
     struct sockaddr_in addr;
-    uv_ip4_addr("0.0.0.0", 9080, &addr);
+    uv_ip4_addr("0.0.0.0", 8080, &addr);
     std::cout << "Start server at port" << std::to_string(8080) << std::endl;
 
     uv_tcp_bind(&m_server, (const struct sockaddr*)&addr, 0);
