@@ -9,7 +9,7 @@ EXECUTABLES = \
 all: $(EXECUTABLES)
 
 client: main.cpp
-	$(CC) $(CCFLAGS) $^ -o $@ $(LDFLAGS)
+	$(CC) $(CCFLAGS) $^ -o $@ $(LDFLAGS) $(LDLIBUV)
 
 .PHONY: clean
 

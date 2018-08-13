@@ -8,3 +8,11 @@
 
     json:
         curl -LO https://github.com/nlohmann/json/releases/download/v3.1.2/json.hpp
+* to build:
+    $make
+
+* to run:
+    EX: ./client -i 172.18.0.2 -p 9090 -c hello
+    EX: ./client -i 172.18.0.2 -p 9090 -c list
+    EX: ./client -i 172.18.0.2 -p 9090 -c query -d 1 -h 1
+
