@@ -15,4 +15,3 @@
     EX: ./client -i 172.18.0.2 -p 9090 -c hello
     EX: ./client -i 172.18.0.2 -p 9090 -c list
     EX: ./client -i 172.18.0.2 -p 9090 -c query -d 1 -h 1
-

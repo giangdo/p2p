@@ -39,10 +39,18 @@ std::map<std::string, std::string> Db::getAliveClientFrom(int hours) {
 
     m_mu.lock();
     for(auto const &entry : m_clDb) {
-        if (entry.second.isAlive == true) {
+        // Get the time when this node is started alive
+        std::time_t st = std::chrono::system_clock::to_time_t(entry.second.startLive);
+
+        // Get the time satisfied for query command
+        std::chrono::system_clock::time_point now = std::chrono::system_clock::now();
+        std::time_t now_c = std::chrono::system_clock::to_time_t(now - std::chrono::hours(hours));
+
+        double d = std::difftime(st, now_c);
+        //std::cout << "diff :" << d << std::endl;
+        if ((entry.second.isAlive == true) && (d > 0)) {
             // TODO add more condition
-            std::time_t now = std::chrono::system_clock::to_time_t(entry.second.startLive);
-            std::string nowStr(std::ctime(&now));
+            std::string nowStr(std::ctime(&st));
             clMap[entry.first] = nowStr;
         }
     }

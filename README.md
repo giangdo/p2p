@@ -16,25 +16,5 @@ Prequisite for build:
     ubuntu18.04
     apt install cmake make g++ gcc automake libtool gdb valgrind libuv1-dev
 
-Design for server:
-    Data structure that contain information of status of a node
-        if the latest ping result from server to node A is ok:
-            {node A, {alive, start_time_of_consequence_successful_ping}}
-
-        if the latest ping result from server to node A is ok:
-            {node A, {dead, 0}}
-    EX:
-        7:00 -> first time receive "hello" from client
-            {node A, {alive, 7:00}}
-        7:01 -> ping success
-            {node A, {alive, 7:00}}
-        7:02 -> ping success
-            {node A, {alive, 7:00}}
-        7:03 -> ping fail
-            {node A, {dead, 0}}
-        7:04 -> ping fail
-            {node A, {dead, 0}}
-        7:05 -> ping ping success
-            {node A, {alive, 7:05}}
-        7:06 -> ping ping success
-            {node A, {alive, 7:05}}
+    Or we can use my docker image:
+        docker pull giangdo/ubuntu18.04

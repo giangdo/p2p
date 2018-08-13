@@ -25,7 +25,7 @@ class Arg {
         int m_port;
         std::string m_cmd; // can be hello, list, query
         int m_day = 0;
-        int m_hour = 0;
+        int m_hour = 1;
 
         void printHelp();
 };
