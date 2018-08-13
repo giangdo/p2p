@@ -4,41 +4,34 @@
 #include <string.h>
 #include <uv.h>
 #include "json.hpp"
+#include "main.h"
 
 using Json = nlohmann::json;
 
-#define DEFAULT_PORT 9090
-#define DEFAULT_BACKLOG 128
+uv_loop_t* CmdHdl::m_loop = nullptr;
+uv_tcp_t CmdHdl::m_server;
 
-uv_loop_t *loop;
-
-typedef struct {
-    uv_write_t req;
-    uv_buf_t buf;
-} write_req_t;
-
-void free_write_req(uv_write_t *req) {
+void CmdHdl::free_write_req(uv_write_t *req) {
     write_req_t *wr = (write_req_t*) req;
     free(wr->buf.base);
     free(wr);
 }
 
-void alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
+void CmdHdl::alloc_buffer(uv_handle_t *handle, size_t suggested_size, uv_buf_t *buf) {
     buf->base = (char*) malloc(suggested_size);
     buf->len = suggested_size;
 }
 
-void echo_write(uv_write_t *req, int status) {
+void CmdHdl::echo_write(uv_write_t *req, int status) {
     if (status) {
         fprintf(stderr, "Write error %s\n", uv_strerror(status));
     }
     free_write_req(req);
 }
 
-void echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
+void CmdHdl::echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
     if (nread > 0) {
         write_req_t *req = (write_req_t*) malloc(sizeof(write_req_t));
-
 
         // Get message
         std::string rcvStr = std::string(buf->base);
@@ -89,7 +82,7 @@ void echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
     free(buf->base);
 }
 
-void on_new_connection(uv_stream_t *server, int status) {
+void CmdHdl::on_new_connection(uv_stream_t *server, int status) {
     if (status < 0) {
         fprintf(stderr, "New connection error %s\n", uv_strerror(status));
         // error!
@@ -97,7 +90,7 @@ void on_new_connection(uv_stream_t *server, int status) {
     }
 
     uv_tcp_t *client = (uv_tcp_t*) malloc(sizeof(uv_tcp_t));
-    uv_tcp_init(loop, client);
+    uv_tcp_init(m_loop, client);
     if (uv_accept(server, (uv_stream_t*) client) == 0) {
         struct sockaddr_storage peername;
         int namelen = sizeof(peername);
@@ -123,23 +116,30 @@ void on_new_connection(uv_stream_t *server, int status) {
     }
 }
 
-int main() {
+void CmdHdl::init() {
+    m_loop = uv_default_loop();
+    uv_tcp_init(m_loop, &m_server);
+
     struct sockaddr_in addr;
+    uv_ip4_addr("0.0.0.0", 9090, &addr);
 
-    loop = uv_default_loop();
-
-    uv_tcp_t server;
-    uv_tcp_init(loop, &server);
-
-    uv_ip4_addr("0.0.0.0", DEFAULT_PORT, &addr);
-    std::cout << "Start server at port" << std::to_string(DEFAULT_PORT) << std::endl;
-
-    uv_tcp_bind(&server, (const struct sockaddr*)&addr, 0);
-    int r = uv_listen((uv_stream_t*) &server, DEFAULT_BACKLOG, on_new_connection);
+    uv_tcp_bind(&m_server, (const struct sockaddr*)&addr, 0);
+    int r = uv_listen((uv_stream_t*) &m_server, 128, on_new_connection);
     if (r) {
         fprintf(stderr, "Listen error %s\n", uv_strerror(r));
-        return 1;
+        exit(1);
     }
-    int re = uv_run(loop, UV_RUN_DEFAULT);
-    return re;
+}
+
+void CmdHdl::run(){
+    int re = uv_run(m_loop, UV_RUN_DEFAULT);
+    if (re) {
+        fprintf(stderr, "run error %s\n", uv_strerror(re));
+    }
+}
+
+int main() {
+    std::cout << "Seeder listen command  on port 9090" << std::endl;
+    CmdHdl::init();
+    CmdHdl::run();
 }
