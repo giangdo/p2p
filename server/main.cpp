@@ -11,8 +11,6 @@ using Json = nlohmann::json;
 #define DEFAULT_BACKLOG 128
 
 uv_loop_t *loop;
-struct sockaddr_in addr;
-
 
 typedef struct {
     uv_write_t req;
@@ -40,19 +38,39 @@ void echo_write(uv_write_t *req, int status) {
 void echo_read(uv_stream_t *client, ssize_t nread, const uv_buf_t *buf) {
     if (nread > 0) {
         write_req_t *req = (write_req_t*) malloc(sizeof(write_req_t));
+
+
+        // Get message
         std::string rcvStr = std::string(buf->base);
         std::cout << rcvStr << std::endl;
         auto j = Json::parse(rcvStr);
         std::string cmd = j["cmd"].get<std::string>();
-        int day = j["day"].get<int>();
-        int hour = j["hour"].get<int>();
-        std::cout << cmd << day << hour << std::endl;
-        Json jSend;
-        jSend.push_back("foo0");
-        jSend.push_back("foo1");
-        jSend.push_back("foo2");
-        std::string strSend = jSend.dump(2);
+        std::string helloStr("hello");
+        std::string listStr("list");
+        std::string queryStr("query");
 
+        // Prepare message to send back
+        Json jSend;
+        if (cmd == helloStr) {
+            jSend["response"] = "ok";
+        }
+        else if (cmd == listStr) {
+            jSend.push_back("foo0");
+            jSend.push_back("foo1");
+            jSend.push_back("foo2");
+        }
+        else if (cmd == queryStr) {
+            int day = j["day"].get<int>();
+            int hour = j["hour"].get<int>();
+            std::cout << "from day: " << day << "from hour: " << hour << std::endl;
+
+            jSend.push_back("ffoo0");
+            jSend.push_back("ffoo1");
+            jSend.push_back("ffoo2");
+        }
+
+        // Prepare buffer to send back
+        std::string strSend = jSend.dump(2);
         int len = strlen(strSend.c_str()) + 1;
         char* bufSend = (char*)malloc(len);
         memset(bufSend, 0, len);
@@ -106,6 +124,8 @@ void on_new_connection(uv_stream_t *server, int status) {
 }
 
 int main() {
+    struct sockaddr_in addr;
+
     loop = uv_default_loop();
 
     uv_tcp_t server;
